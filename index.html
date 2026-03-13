@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Medical Document Orchestration — Architecture Blueprint</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --cyan:#0097A7; --cyan-light:#E0F7FA; --cyan-dark:#006064; --cyan-glow:#00BCD4;
+  --black:#0a0a0a; --white:#FAFAFA; --gray-50:#FAFAFA; --gray-100:#F5F5F5;
+  --gray-200:#E0E0E0; --gray-300:#BDBDBD; --gray-500:#9E9E9E; --gray-700:#424242; --gray-900:#1A1A1A;
+  --success:#2E7D32; --warning:#E65100; --error:#C62828;
+  --fd: 'Playfair Display', Georgia, serif;
+  --fb: 'DM Sans', -apple-system, sans-serif;
+  --fm: 'JetBrains Mono', 'Consolas', monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:var(--fb);background:var(--white);color:var(--gray-900);line-height:1.7;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+
+/* ─── Hero ─── */
+.hero{position:relative;min-height:50vh;display:flex;flex-direction:column;justify-content:center;padding:70px 80px;background:var(--black);overflow:hidden}
+.hero::before{content:'';position:absolute;top:-40%;right:-15%;width:700px;height:700px;background:radial-gradient(circle,rgba(0,151,167,.12) 0%,transparent 70%);animation:hg 8s ease-in-out infinite}
+.hero::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--cyan-dark),var(--cyan),var(--cyan-glow),var(--cyan),var(--cyan-dark));background-size:200% 100%;animation:sh 3s linear infinite}
+@keyframes hg{0%,100%{opacity:.3;transform:scale(1)}50%{opacity:.6;transform:scale(1.08)}}
+@keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.hero-label{font-family:var(--fm);font-size:11px;letter-spacing:5px;text-transform:uppercase;color:var(--cyan);margin-bottom:24px;opacity:0;animation:su .7s ease-out .1s forwards}
+.hero h1{font-family:var(--fd);font-size:clamp(34px,4.5vw,56px);font-weight:900;color:var(--white);line-height:1.1;max-width:780px;opacity:0;animation:su .7s ease-out .2s forwards}
+.hero h1 span{color:var(--cyan)}
+.hero-meta{display:flex;gap:48px;margin-top:32px;flex-wrap:wrap;opacity:0;animation:su .7s ease-out .35s forwards}
+.hero-meta-item{font-family:var(--fm);font-size:12px;color:var(--gray-500)}
+.hero-meta-item strong{display:block;color:var(--cyan);font-size:10px;letter-spacing:2.5px;text-transform:uppercase;margin-bottom:4px}
+@keyframes su{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
+
+/* ─── Nav ─── */
+.nav{position:sticky;top:0;z-index:100;background:rgba(250,250,250,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--gray-200);padding:0 80px;display:flex;align-items:center;overflow-x:auto}
+.nav a{font-family:var(--fm);font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--gray-700);text-decoration:none;padding:16px 18px;white-space:nowrap;border-bottom:2px solid transparent;transition:all .2s}
+.nav a:hover,.nav a.active{color:var(--cyan-dark);border-bottom-color:var(--cyan)}
+
+/* ─── Sections ─── */
+.sec{padding:72px 80px;max-width:1280px;margin:0 auto;opacity:0;transform:translateY(40px);transition:all .8s cubic-bezier(.16,1,.3,1)}
+.sec.v{opacity:1;transform:translateY(0)}
+.sec-label{font-family:var(--fm);font-size:10px;letter-spacing:4px;text-transform:uppercase;color:var(--cyan);margin-bottom:12px}
+.sec h2{font-family:var(--fd);font-size:clamp(26px,3.2vw,38px);font-weight:700;color:var(--gray-900);margin-bottom:14px;line-height:1.2}
+.sec-desc{font-size:15px;color:var(--gray-700);max-width:700px;margin-bottom:36px}
+
+/* ─── Pipeline Cards (the main design element) ─── */
+.pipeline-flow{display:flex;align-items:stretch;gap:0;margin:36px 0;overflow-x:auto;padding-bottom:8px}
+.pipe-card{flex:1;min-width:135px;background:var(--white);border:1px solid var(--gray-200);padding:28px 18px 22px;text-align:center;position:relative;transition:all .25s}
+.pipe-card:first-child{border-radius:14px 0 0 14px}
+.pipe-card:last-child{border-radius:0 14px 14px 0}
+.pipe-card:hover{background:var(--cyan-light);transform:translateY(-3px);box-shadow:0 8px 28px rgba(0,151,167,.1)}
+.pipe-card::after{content:'→';position:absolute;right:-11px;top:50%;transform:translateY(-50%);font-size:18px;color:var(--cyan);font-weight:700;z-index:2}
+.pipe-card:last-child::after{content:none}
+.pipe-card img{width:44px;height:44px;margin:0 auto 12px;display:block;object-fit:contain}
+.pipe-card .pc-name{font-family:var(--fb);font-size:12px;font-weight:700;color:var(--gray-900);margin-bottom:4px}
+.pipe-card .pc-sub{font-family:var(--fm);font-size:9px;color:var(--gray-500);letter-spacing:.5px}
+
+/* ─── SVG Animated Diagrams ─── */
+.svg-diagram{background:var(--white);border:1px solid var(--gray-200);border-radius:14px;padding:40px 24px 24px;margin:32px 0;position:relative;overflow:visible;box-shadow:0 2px 20px rgba(0,0,0,.03)}
+.svg-diagram::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:14px 14px 0 0;background:linear-gradient(90deg,var(--cyan),var(--cyan-glow),var(--cyan))}
+.svg-diagram svg{display:block;margin:0 auto;max-width:100%}
+@keyframes flowDash{to{stroke-dashoffset:-24}}
+@keyframes nodeGlow{0%,100%{filter:drop-shadow(0 0 0 rgba(0,151,167,0))}50%{filter:drop-shadow(0 0 10px rgba(0,151,167,.3))}}
+@keyframes nodeFadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.svg-flow{stroke:var(--cyan);stroke-width:2;fill:none;stroke-dasharray:10 5;animation:flowDash 1.2s linear infinite}
+.svg-flow-err{stroke:var(--error);stroke-width:1.5;fill:none;stroke-dasharray:5 4;animation:flowDash 1.5s linear infinite}
+.svg-node{animation:nodeFadeIn .6s ease-out both}
+.svg-node:nth-child(2){animation-delay:.08s}
+.svg-node:nth-child(3){animation-delay:.16s}
+.svg-node:nth-child(4){animation-delay:.24s}
+.svg-node:nth-child(5){animation-delay:.32s}
+.svg-node:nth-child(6){animation-delay:.4s}
+.svg-node:nth-child(7){animation-delay:.48s}
+.svg-node:nth-child(8){animation-delay:.56s}
+.svg-node:nth-child(9){animation-delay:.64s}
+.svg-node:nth-child(10){animation-delay:.72s}
+.svg-node:hover{animation:nodeGlow 1.5s ease-in-out infinite}
+.svg-caption{text-align:center;font-family:var(--fm);font-size:10px;color:var(--gray-500);margin-top:12px;letter-spacing:1px}
+
+/* ─── Fragment (detail sections) ─── */
+.frag{padding:64px 80px;max-width:1280px;margin:0 auto;border-top:1px solid var(--gray-200);opacity:0;transform:translateY(40px);transition:all .8s cubic-bezier(.16,1,.3,1)}
+.frag.v{opacity:1;transform:translateY(0)}
+.frag-head{display:flex;align-items:center;gap:24px;margin-bottom:28px}
+.frag-num{font-family:var(--fd);font-size:52px;font-weight:900;color:var(--cyan);line-height:1;flex-shrink:0;text-shadow:0 2px 12px rgba(0,151,167,.2)}
+.frag-head h2{font-family:var(--fd);font-size:26px;font-weight:700;color:var(--gray-900)}
+.frag-desc{font-size:14px;color:var(--gray-700);max-width:700px;margin-bottom:32px}
+
+/* ─── Service Cards Grid ─── */
+.svc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin:28px 0}
+.svc-card{background:var(--white);border:1px solid var(--gray-200);border-radius:12px;padding:24px 20px;text-align:center;transition:all .25s;position:relative;overflow:hidden}
+.svc-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--cyan);transform:scaleX(0);transition:transform .3s;transform-origin:left}
+.svc-card:hover::before{transform:scaleX(1)}
+.svc-card:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,.06)}
+.svc-card img{width:40px;height:40px;margin:0 auto 12px;display:block;object-fit:contain}
+.svc-card .svc-name{font-size:13px;font-weight:700;color:var(--gray-900);margin-bottom:4px}
+.svc-card .svc-detail{font-size:11px;color:var(--gray-500);line-height:1.4}
+
+/* ─── Arrow connector between card grids ─── */
+.flow-arrow{text-align:center;padding:16px 0;font-size:28px;color:var(--cyan);animation:bounce 2s ease-in-out infinite}
+@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(6px)}}
+
+/* ─── API Tables ─── */
+.api-block{margin-top:28px}
+.api-block h3{font-family:var(--fm);font-size:11px;font-weight:700;color:var(--cyan-dark);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid var(--cyan);display:inline-block}
+.tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:13px;border-radius:10px;overflow:hidden;border:1px solid var(--gray-200);margin-bottom:18px}
+.tbl thead th{background:var(--black);color:#fff;font-family:var(--fm);font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:12px 14px;text-align:left}
+.tbl tbody td{padding:10px 14px;border-bottom:1px solid var(--gray-200);vertical-align:top;line-height:1.55}
+.tbl tbody tr:nth-child(even){background:var(--gray-100)}
+.tbl tbody tr:hover{background:var(--cyan-light);transition:background .15s}
+.api-name{font-family:var(--fm);font-weight:600;color:var(--cyan-dark);font-size:12px}
+.vb{display:inline-block;font-family:var(--fm);font-size:10px;font-weight:700;background:var(--cyan-light);color:var(--cyan-dark);padding:3px 10px;border-radius:20px;border:1px solid var(--cyan)}
+.lb{display:inline-block;font-family:var(--fm);font-size:10px;font-weight:600;background:var(--gray-100);color:var(--gray-700);padding:3px 10px;border-radius:20px;border:1px solid var(--gray-200);margin:2px 2px}
+.ct{display:inline-block;font-family:var(--fm);font-size:9px;font-weight:700;background:var(--cyan-dark);color:#fff;padding:2px 7px;border-radius:3px;margin-left:6px;vertical-align:middle}
+
+/* ─── Milestones ─── */
+.ms-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px;margin-top:28px}
+.ms-card{background:var(--white);border:1px solid var(--gray-200);border-radius:12px;padding:26px 22px;position:relative;overflow:hidden;transition:transform .2s,box-shadow .2s}
+.ms-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.06)}
+.ms-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--cyan)}
+.ms-phase{font-family:var(--fm);font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--cyan);margin-bottom:6px}
+.ms-title{font-size:16px;font-weight:700;color:var(--gray-900);margin-bottom:4px}
+.ms-time{font-family:var(--fm);font-size:11px;color:var(--gray-500);margin-bottom:12px}
+.ms-scope{font-size:12px;color:var(--gray-700);margin-bottom:14px;line-height:1.5}
+.ev-label{font-family:var(--fm);font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--success);margin-bottom:6px}
+.ev-list{list-style:none;padding:0}
+.ev-list li{font-size:11px;color:var(--gray-700);padding:4px 0 4px 18px;position:relative;border-bottom:1px solid var(--gray-100)}
+.ev-list li:last-child{border-bottom:none}
+.ev-list li::before{content:'✓';position:absolute;left:0;top:4px;color:var(--success);font-weight:700;font-size:12px}
+
+/* ─── CI/CD ─── */
+.cicd-flow{display:flex;align-items:stretch;gap:0;margin:28px 0;overflow-x:auto;padding-bottom:8px}
+.cicd-s{flex:1;min-width:145px;background:var(--white);border:1px solid var(--gray-200);padding:22px 16px;position:relative;transition:all .2s;text-align:center}
+.cicd-s:first-child{border-radius:12px 0 0 12px}
+.cicd-s:last-child{border-radius:0 12px 12px 0}
+.cicd-s:hover{background:var(--cyan-light)}
+.cicd-s::after{content:'→';position:absolute;right:-10px;top:50%;transform:translateY(-50%);font-size:18px;color:var(--cyan);font-weight:700;z-index:2}
+.cicd-s:last-child::after{content:none}
+.cicd-s img{width:32px;height:32px;margin:0 auto 8px;display:block}
+.cicd-sn{font-family:var(--fm);font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--cyan-dark);margin-bottom:4px}
+.cicd-sd{font-size:11px;color:var(--gray-700);line-height:1.4}
+
+/* ─── Pricing ─── */
+.policy-box{background:var(--cyan-dark);border-radius:12px;padding:28px 32px;margin:28px 0;position:relative;overflow:hidden}
+.policy-box::after{content:'';position:absolute;top:0;right:0;bottom:0;width:4px;background:var(--cyan-glow)}
+.policy-box h3{font-family:var(--fm);font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--cyan-glow);margin-bottom:10px}
+.policy-box p{font-size:14px;color:rgba(255,255,255,.9);line-height:1.7;max-width:700px}
+.policy-box p strong{color:#fff}
+.ptbl{width:100%;border-collapse:separate;border-spacing:0;border-radius:12px;overflow:hidden;border:1px solid var(--gray-200);margin:24px 0;font-size:13px}
+.ptbl thead th{background:var(--black);color:#fff;font-family:var(--fm);font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:13px 14px;text-align:left}
+.ptbl tbody td{padding:11px 14px;border-bottom:1px solid var(--gray-200);vertical-align:top;line-height:1.55}
+.ptbl tbody tr:nth-child(even){background:var(--gray-100)}
+.ptbl tbody tr:hover{background:var(--cyan-light);transition:background .15s}
+.ptbl tfoot td{background:var(--cyan-light);padding:14px;font-weight:700;border-top:2px solid var(--cyan)}
+.hr{font-family:var(--fm);font-weight:700;font-size:14px}
+.hr-min{color:var(--cyan)}
+.hr-max{color:var(--cyan-dark)}
+.et{display:inline-block;font-family:var(--fm);font-size:10px;font-weight:600;background:#E8F5E9;color:#2E7D32;padding:2px 8px;border-radius:4px;margin:2px 2px}
+.est-box{background:var(--black);border-radius:12px;padding:28px 32px;margin:28px 0;text-align:center}
+.est-box .el{font-family:var(--fm);font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--gray-500);margin-bottom:8px}
+.est-box .ev{font-family:var(--fd);font-size:42px;font-weight:900;color:var(--cyan);line-height:1;margin-bottom:8px}
+.est-box .en{font-size:13px;color:var(--gray-500)}
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:24px 0}
+.fc{background:var(--white);border:1px solid var(--gray-200);border-radius:10px;padding:20px}
+.fc.fmin{border-left:3px solid var(--cyan)}
+.fc.fmax{border-left:3px solid var(--warning)}
+.fc-l{font-family:var(--fm);font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px}
+.fc.fmin .fc-l{color:var(--cyan)}
+.fc.fmax .fc-l{color:var(--warning)}
+.fc ul{list-style:none;padding:0;font-size:12px;color:var(--gray-700)}
+.fc ul li{padding:4px 0 4px 16px;position:relative}
+.fc.fmin ul li::before{content:'↓';position:absolute;left:0;color:var(--cyan);font-weight:700}
+.fc.fmax ul li::before{content:'↑';position:absolute;left:0;color:var(--warning);font-weight:700}
+.gg{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin:24px 0}
+.gi{background:var(--white);border:1px solid var(--gray-200);border-radius:10px;padding:18px;transition:transform .2s,box-shadow .2s}
+.gi:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.05)}
+.gi-i{font-size:22px;margin-bottom:6px}
+.gi-t{font-size:13px;font-weight:700;color:var(--cyan-dark);margin-bottom:4px}
+.gi-d{font-size:11px;color:var(--gray-700);line-height:1.5}
+
+/* ─── Footer ─── */
+.footer{background:var(--black);padding:44px 80px;text-align:center;color:var(--gray-500);font-family:var(--fm);font-size:11px}
+.footer span{color:var(--cyan)}
+
+@media(max-width:900px){
+  .hero,.sec,.frag,.nav,.footer{padding-left:24px;padding-right:24px}
+  .pipeline-flow,.cicd-flow{flex-direction:column}
+  .pipe-card,.cicd-s{border-radius:0!important}
+  .pipe-card::after,.cicd-s::after{content:'↓'!important;right:50%;top:auto;bottom:-14px;transform:translateX(50%)}
+  .pipe-card:last-child::after,.cicd-s:last-child::after{content:none!important}
+  .frag-head{flex-direction:column;gap:8px}
+  .fg{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ HERO ═══ -->
+<header class="hero">
+  <div class="hero-label">Architecture Blueprint — v4.0</div>
+  <h1>Medical Document<br><span>Orchestration System</span></h1>
+  <div class="hero-meta">
+    <div class="hero-meta-item"><strong>Platform</strong>Microsoft Azure AI</div>
+    <div class="hero-meta-item"><strong>Backend</strong>Python · Flask Blueprints</div>
+    <div class="hero-meta-item"><strong>Storage</strong>Cosmos DB · Vector Search</div>
+    <div class="hero-meta-item"><strong>Compliance</strong>HIPAA · Managed Identities</div>
+    <div class="hero-meta-item"><strong>CI/CD</strong>GitHub Actions</div>
+  </div>
+</header>
+
+<!-- ═══ NAV ═══ -->
+<nav class="nav">
+  <a href="#overview">Overview</a>
+  <a href="#f1">01 Ingestion</a>
+  <a href="#f2">02 Classification</a>
+  <a href="#f3">03 Extraction</a>
+  <a href="#f4">04 Health NER</a>
+  <a href="#f5">05 Vectorization</a>
+  <a href="#f6">06 Patient Access</a>
+  <a href="#f7">07 Monitoring</a>
+  <a href="#milestones">Milestones</a>
+  <a href="#cicd">CI/CD</a>
+  <a href="#pricing">Pricing</a>
+  <a href="#deploy">Deploy</a>
+</nav>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- OVERVIEW                                    -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="sec" id="overview">
+  <div class="sec-label">System Overview</div>
+  <h2>End-to-End Pipeline</h2>
+  <p class="sec-desc">Every email captured, every attachment extracted, classified, processed, vectorized, and searchable by Patient ID. Zero documents dropped. Full provenance on every signal.</p>
+
+  <p class="frag-desc">The system operates as a fully automated pipeline triggered by incoming emails on a dedicated mailbox. Microsoft Graph webhooks detect new messages in real time, extract all attached documents, and route them through a series of Azure AI services — from document classification to clinical entity extraction. Each step produces structured, verifiable outputs rather than AI-generated summaries, ensuring that clinicians can trust every piece of information displayed.</p>
+  <p class="frag-desc">At the end of the pipeline, every clinical signal is stored as a structured card in Cosmos DB, indexed by Patient ID, and made accessible through a Chrome Extension that integrates directly into the EMR workflow. A parallel monitoring dashboard tracks the health of the entire system — emails received, documents processed, errors encountered — with zero tolerance for silent failures. Any document that encounters a processing issue is flagged and queued for human review, never dropped.</p>
+
+  <div class="svg-diagram">
+    <svg viewBox="0 0 1060 320" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:1060px">
+      <defs>
+        <marker id="ah" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#0097A7"/></marker>
+        <marker id="ahe" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#C62828"/></marker>
+        <filter id="ns"><feDropShadow dx="0" dy="2" stdDeviation="4" flood-opacity=".07"/></filter>
+        <linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#E0F7FA"/><stop offset="100%" stop-color="#fff"/></linearGradient>
+        <linearGradient id="dg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#006064"/><stop offset="100%" stop-color="#00838F"/></linearGradient>
+      </defs>
+
+      <!-- Nodes -->
+      <g class="svg-node" filter="url(#ns)">
+        <rect x="5" y="110" width="118" height="78" rx="10" fill="url(#cg)" stroke="#0097A7" stroke-width="1.5"/>
+        <image href="https://img.icons8.com/fluency/96/microsoft-outlook-2019.png" x="42" y="116" width="34" height="34"/>
+        <text x="64" y="168" text-anchor="middle" font-family="DM Sans" font-size="11" font-weight="700" fill="#1A1A1A">Email Webhook</text>
+        <text x="64" y="181" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#9E9E9E">Microsoft Graph</text>
+      </g>
+      <g class="svg-node" filter="url(#ns)">
+        <rect x="155" y="110" width="118" height="78" rx="10" fill="url(#cg)" stroke="#0097A7" stroke-width="1.5"/>
+        <image href="https://azure.microsoft.com/svghandler/cognitive-services/?width=96" x="192" y="116" width="34" height="34"/>
+        <text x="214" y="168" text-anchor="middle" font-family="DM Sans" font-size="11" font-weight="700" fill="#1A1A1A">Classification</text>
+        <text x="214" y="181" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#9E9E9E">Doc Intelligence v4</text>
+      </g>
+      <g class="svg-node" filter="url(#ns)">
+        <rect x="305" y="110" width="118" height="78" rx="10" fill="url(#cg)" stroke="#0097A7" stroke-width="1.5"/>
+        <image href="https://azure.microsoft.com/svghandler/cognitive-services/?width=96" x="342" y="116" width="34" height="34"/>
+        <text x="364" y="168" text-anchor="middle" font-family="DM Sans" font-size="11" font-weight="700" fill="#1A1A1A">Form Rec v4</text>
+        <text x="364" y="181" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#9E9E9E">Content Extraction</text>
+      </g>
+      <g class="svg-node" filter="url(#ns)">
+        <rect x="455" y="110" width="118" height="78" rx="10" fill="url(#cg)" stroke="#0097A7" stroke-width="1.5"/>
+        <image href="https://img.icons8.com/fluency/96/artificial-intelligence.png" x="492" y="116" width="34" height="34"/>
+        <text x="514" y="168" text-anchor="middle" font-family="DM Sans" font-size="11" font-weight="700" fill="#1A1A1A">Health NER</text>
+        <text x="514" y="181" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#9E9E9E">Entity Recognition</text>
+      </g>
+      <g class="svg-node" filter="url(#ns)">
+        <rect x="605" y="110" width="118" height="78" rx="10" fill="url(#cg)" stroke="#0097A7" stroke-width="1.5"/>
+        <image href="https://img.icons8.com/fluency/96/cards.png" x="642" y="116" width="34" height="34"/>
+        <text x="664" y="168" text-anchor="middle" font-family="DM Sans" font-size="11" font-weight="700" fill="#1A1A1A">Signal Cards</text>
+        <text x="664" y="181" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#9E9E9E">Source Tagged</text>
+      </g>
+      <g class="svg-node" filter="url(#ns)">
+        <rect x="605" y="15" width="118" height="68" rx="10" fill="url(#cg)" stroke="#0097A7" stroke-width="1.5"/>
+        <image href="https://azure.microsoft.com/svghandler/openai/?width=96" x="642" y="20" width="30" height="30"/>
+        <text x="664" y="60" text-anchor="middle" font-family="DM Sans" font-size="11" font-weight="700" fill="#1A1A1A">Embeddings</text>
+        <text x="664" y="72" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#9E9E9E">Azure OpenAI</text>
+      </g>
+      <g class="svg-node" filter="url(#ns)">
+        <rect x="760" y="70" width="128" height="78" rx="10" fill="url(#dg)" stroke="#0097A7" stroke-width="1.5"/>
+        <image href="https://azure.microsoft.com/svghandler/cosmos-db/?width=96" x="800" y="76" width="34" height="34"/>
+        <text x="824" y="126" text-anchor="middle" font-family="DM Sans" font-size="11" font-weight="700" fill="#fff">Cosmos DB</text>
+        <text x="824" y="139" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="rgba(255,255,255,.7)">Vectors + Cards</text>
+      </g>
+      <g class="svg-node" filter="url(#ns)">
+        <rect x="920" y="70" width="128" height="78" rx="10" fill="url(#dg)" stroke="#0097A7" stroke-width="1.5"/>
+        <image href="https://img.icons8.com/fluency/96/chrome.png" x="962" y="76" width="34" height="34"/>
+        <text x="984" y="126" text-anchor="middle" font-family="DM Sans" font-size="11" font-weight="700" fill="#fff">Chrome Ext</text>
+        <text x="984" y="139" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="rgba(255,255,255,.7)">Patient ID Sync</text>
+      </g>
+      <!-- Error nodes -->
+      <g class="svg-node" filter="url(#ns)">
+        <rect x="305" y="230" width="118" height="62" rx="10" fill="#FFF5F5" stroke="#C62828" stroke-width="1.5"/>
+        <text x="364" y="258" text-anchor="middle" font-family="DM Sans" font-size="11" font-weight="700" fill="#C62828">Error Handler</text>
+        <text x="364" y="272" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#9E9E9E">Flag + Task</text>
+      </g>
+      <g class="svg-node" filter="url(#ns)">
+        <rect x="455" y="230" width="118" height="62" rx="10" fill="#F5F5F5" stroke="#424242" stroke-width="1.5"/>
+        <image href="https://azure.microsoft.com/svghandler/monitor/?width=96" x="492" y="234" width="30" height="30"/>
+        <text x="514" y="272" text-anchor="middle" font-family="DM Sans" font-size="11" font-weight="700" fill="#1A1A1A">Dashboard</text>
+      </g>
+
+      <!-- Animated flow paths -->
+      <line x1="123" y1="149" x2="155" y2="149" class="svg-flow" marker-end="url(#ah)"/>
+      <line x1="273" y1="149" x2="305" y2="149" class="svg-flow" marker-end="url(#ah)"/>
+      <line x1="423" y1="149" x2="455" y2="149" class="svg-flow" marker-end="url(#ah)"/>
+      <line x1="573" y1="149" x2="605" y2="149" class="svg-flow" marker-end="url(#ah)"/>
+      <!-- Cards → Cosmos -->
+      <path d="M 723 140 Q 742 110 760 110" class="svg-flow" fill="none" marker-end="url(#ah)"/>
+      <!-- Embeddings → Cosmos -->
+      <line x1="723" y1="50" x2="760" y2="90" class="svg-flow" marker-end="url(#ah)"/>
+      <!-- FormRec → Embeddings (chunk path) -->
+      <path d="M 380 110 Q 380 49 605 49" class="svg-flow" fill="none" marker-end="url(#ah)"/>
+      <!-- Cosmos → Chrome -->
+      <line x1="888" y1="109" x2="920" y2="109" class="svg-flow" marker-end="url(#ah)"/>
+      <!-- Error paths -->
+      <line x1="364" y1="188" x2="364" y2="230" class="svg-flow-err" marker-end="url(#ahe)"/>
+      <path d="M 214 188 Q 214 260 305 260" class="svg-flow-err" fill="none" marker-end="url(#ahe)"/>
+      <line x1="423" y1="261" x2="455" y2="261" class="svg-flow-err" marker-end="url(#ahe)" style="stroke:var(--gray-500)"/>
+    </svg>
+    <div class="svg-caption">End-to-end pipeline: Email → Classification → Extraction → NER → Signal Cards → Cosmos DB → Chrome Extension</div>
+  </div>
+
+  <div class="pipeline-flow">
+    <div class="pipe-card">
+      <img src="https://img.icons8.com/fluency/96/microsoft-outlook-2019.png" alt="Email">
+      <div class="pc-name">Email Webhook</div>
+      <div class="pc-sub">Microsoft Graph</div>
+    </div>
+    <div class="pipe-card">
+      <img src="https://azure.microsoft.com/svghandler/cognitive-services/?width=96" alt="Classification">
+      <div class="pc-name">Classification</div>
+      <div class="pc-sub">Doc Intelligence</div>
+    </div>
+    <div class="pipe-card">
+      <img src="https://azure.microsoft.com/svghandler/cognitive-services/?width=96" alt="Extraction">
+      <div class="pc-name">Form Rec v4</div>
+      <div class="pc-sub">Content Extraction</div>
+    </div>
+    <div class="pipe-card">
+      <img src="https://img.icons8.com/fluency/96/artificial-intelligence.png" alt="Health NER">
+      <div class="pc-name">Health NER</div>
+      <div class="pc-sub">Entity Recognition</div>
+    </div>
+    <div class="pipe-card">
+      <img src="https://azure.microsoft.com/svghandler/openai/?width=96" alt="Embeddings">
+      <div class="pc-name">Embeddings</div>
+      <div class="pc-sub">Azure OpenAI</div>
+    </div>
+    <div class="pipe-card">
+      <img src="https://azure.microsoft.com/svghandler/cosmos-db/?width=96" alt="Cosmos DB">
+      <div class="pc-name">Cosmos DB</div>
+      <div class="pc-sub">Vectors + Cards</div>
+    </div>
+    <div class="pipe-card">
+      <img src="https://img.icons8.com/fluency/96/chrome.png" alt="Chrome Extension">
+      <div class="pc-name">Chrome Ext</div>
+      <div class="pc-sub">Patient ID Sync</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- FRAGMENT 1 — INGESTION                      -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="frag" id="f1">
+  <div class="frag-head"><div class="frag-num">01</div><div><h2>Email Ingestion & Attachment Extraction</h2></div></div>
+  <p class="frag-desc">Webhook on dedicated mailbox via Microsoft Graph. Every email captured, attachments extracted, video MIME types detected and flagged. Zero documents dropped — failures create human intervention tasks.</p>
+
+  <p class="frag-desc">The ingestion layer is built on Microsoft Graph API subscriptions that listen to a dedicated mailbox in real time. When an email arrives, the webhook fires immediately, authenticating via Azure Managed Identity (zero secrets stored anywhere), and extracts every attachment regardless of format — PDFs, DOCX, images, spreadsheets, or any other file type. Each attachment's MIME type is inspected: video attachments (video/*) are detected and flagged with their count and type, while all documents are uploaded to Azure Blob Storage with full metadata (source email ID, timestamp, and Patient ID when parseable from the email subject or body).</p>
+  <p class="frag-desc">The critical design principle here is zero document loss. If any step in the ingestion process fails — whether it's a network timeout, a corrupt attachment, or an unsupported format — the document is still stored in Blob Storage and a human intervention task is created automatically. The system never silently drops a document. Every failure is visible, traceable, and actionable. This error-handling philosophy propagates through the entire pipeline and is surfaced in the monitoring dashboard described in Section 07.</p>
+
+  <div class="svg-diagram">
+    <svg viewBox="0 0 880 220" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:880px">
+      <defs><marker id="a1h" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#0097A7"/></marker></defs>
+      <g class="svg-node" filter="url(#ns)">
+        <rect x="5" y="70" width="120" height="72" rx="10" fill="url(#cg)" stroke="#0097A7" stroke-width="1.5"/>
+        <image href="https://img.icons8.com/fluency/96/microsoft-outlook-2019.png" x="42" y="76" width="32" height="32"/>
+        <text x="65" y="122" text-anchor="middle" font-family="DM Sans" font-size="10" font-weight="700" fill="#1A1A1A">Incoming Email</text>
+      </g>
+      <g class="svg-node" filter="url(#ns)">
+        <rect x="160" y="70" width="130" height="72" rx="10" fill="url(#cg)" stroke="#0097A7" stroke-width="1.5"/>
+        <image href="https://img.icons8.com/fluency/96/microsoft-365.png" x="202" y="76" width="32" height="32"/>
+        <text x="225" y="122" text-anchor="middle" font-family="DM Sans" font-size="10" font-weight="700" fill="#1A1A1A">Graph Webhook</text>
+      </g>
+      <g class="svg-node" filter="url(#ns)">
+        <rect x="325" y="70" width="130" height="72" rx="10" fill="url(#cg)" stroke="#0097A7" stroke-width="1.5"/>
+        <image href="https://img.icons8.com/fluency/96/document.png" x="367" y="76" width="32" height="32"/>
+        <text x="390" y="122" text-anchor="middle" font-family="DM Sans" font-size="10" font-weight="700" fill="#1A1A1A">Attachments</text>
+      </g>
+      <g class="svg-node" filter="url(#ns)">
+        <rect x="490" y="15" width="120" height="58" rx="10" fill="#FFF8E1" stroke="#FF8F00" stroke-width="1.5"/>
+        <image href="https://img.icons8.com/fluency/96/video-file.png" x="518" y="20" width="28" height="28"/>
+        <text x="550" y="58" text-anchor="middle" font-family="DM Sans" font-size="10" font-weight="700" fill="#E65100">MIME Check</text>
+      </g>
+      <g class="svg-node" filter="url(#ns)">
+        <rect x="490" y="88" width="120" height="58" rx="10" fill="url(#dg)" stroke="#0097A7" stroke-width="1.5"/>
+        <image href="https://azure.microsoft.com/svghandler/blob-storage/?width=96" x="518" y="92" width="28" height="28"/>
+        <text x="550" y="132" text-anchor="middle" font-family="DM Sans" font-size="10" font-weight="700" fill="#fff">Blob Storage</text>
+      </g>
+      <g class="svg-node" filter="url(#ns)">
+        <rect x="490" y="162" width="120" height="50" rx="10" fill="#FFF5F5" stroke="#C62828" stroke-width="1.5"/>
+        <text x="550" y="186" text-anchor="middle" font-family="DM Sans" font-size="10" font-weight="700" fill="#C62828">Error → Flag</text>
+        <text x="550" y="199" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#9E9E9E">Human Task</text>
+      </g>
+      <g class="svg-node" filter="url(#ns)">
+        <rect x="650" y="85" width="130" height="60" rx="10" fill="url(#dg)" stroke="#0097A7" stroke-width="1.5"/>
+        <text x="715" y="118" text-anchor="middle" font-family="DM Sans" font-size="11" font-weight="700" fill="#fff">→ Classification</text>
+      </g>
+      <!-- Flow -->
+      <line x1="125" y1="106" x2="160" y2="106" class="svg-flow" marker-end="url(#a1h)"/>
+      <line x1="290" y1="106" x2="325" y2="106" class="svg-flow" marker-end="url(#a1h)"/>
+      <path d="M 455 90 Q 472 44 490 44" class="svg-flow" fill="none" marker-end="url(#a1h)"/>
+      <line x1="455" y1="110" x2="490" y2="114" class="svg-flow" marker-end="url(#a1h)"/>
+      <line x1="610" y1="117" x2="650" y2="115" class="svg-flow" marker-end="url(#a1h)"/>
+      <line x1="550" y1="146" x2="550" y2="162" class="svg-flow-err" marker-end="url(#ahe)"/>
+    </svg>
+  </div>
+
+  <div class="svc-grid">
+    <div class="svc-card">
+      <img src="https://img.icons8.com/fluency/96/microsoft-outlook-2019.png" alt="Outlook">
+      <div class="svc-name">Incoming Email</div>
+      <div class="svc-detail">Dedicated mailbox trigger</div>
+    </div>
+    <div class="svc-card">
+      <img src="https://img.icons8.com/fluency/96/microsoft-365.png" alt="Graph">
+      <div class="svc-name">Graph Webhook</div>
+      <div class="svc-detail">Subscription notification</div>
+    </div>
+    <div class="svc-card">
+      <img src="https://img.icons8.com/fluency/96/document.png" alt="Attachments">
+      <div class="svc-name">Extract Attachments</div>
+      <div class="svc-detail">Graph API v1.0</div>
+    </div>
+    <div class="svc-card">
+      <img src="https://img.icons8.com/fluency/96/video-file.png" alt="Video">
+      <div class="svc-name">MIME Detection</div>
+      <div class="svc-detail">video/* → flag + count</div>
+    </div>
+    <div class="svc-card">
+      <img src="https://azure.microsoft.com/svghandler/blob-storage/?width=96" alt="Blob">
+      <div class="svc-name">Blob Storage</div>
+      <div class="svc-detail">Every file stored</div>
+    </div>
+    <div class="svc-card">
+      <img src="https://img.icons8.com/fluency/96/error.png" alt="Error">
+      <div class="svc-name">Error Handler</div>
+      <div class="svc-detail">Flag + human task</div>
+    </div>
+  </div>
+
+  <div class="api-block">
+    <h3>Azure APIs</h3>
+    <table class="tbl"><thead><tr><th>API / Service</th><th>Version</th><th>Expected Output</th></tr></thead><tbody>
+      <tr><td class="api-name">Microsoft Graph — Webhooks</td><td><span class="vb">v1.0</span></td><td>Subscription with notification URL. Fires on each new email.</td></tr>
+      <tr><td class="api-name">Microsoft Graph — List Attachments</td><td><span class="vb">v1.0</span></td><td>Attachment objects: <code>name</code>, <code>contentType</code> (MIME), <code>contentBytes</code>, <code>size</code>.</td></tr>
+      <tr><td class="api-name">Azure Blob Storage — Upload</td><td><span class="vb">2024-11-04</span></td><td>Blob URL + metadata (email ID, timestamp, Patient ID). Every attachment stored regardless of status.</td></tr>
+    </tbody></table>
+    <h3>Custom APIs & Libraries</h3>
+    <table class="tbl"><thead><tr><th>Endpoint</th><th>Libraries</th><th>Output</th></tr></thead><tbody>
+      <tr><td class="api-name">POST /api/ingest/webhook <span class="ct">CUSTOM</span></td><td><span class="lb">Flask</span><span class="lb">msgraph-sdk</span><span class="lb">azure-identity</span></td><td>Receives notification, extracts attachments, dispatches to Blob. Returns ingestion receipt.</td></tr>
+      <tr><td class="api-name">POST /api/ingest/flag-error <span class="ct">CUSTOM</span></td><td><span class="lb">Flask</span><span class="lb">azure-storage-blob</span></td><td>Flags problematic docs, creates human task. Never drops documents.</td></tr>
+      <tr><td class="api-name">Video MIME Detector <span class="ct">CUSTOM</span></td><td><span class="lb">python-magic</span><span class="lb">mimetypes</span></td><td><code>has_video</code>, <code>video_count</code>, <code>video_types</code>.</td></tr>
+    </tbody></table>
+  </div>
+</div>
+
+<!-- ═══ FRAGMENT 2 — CLASSIFICATION ═══ -->
+<div class="frag" id="f2">
+  <div class="frag-head"><div class="frag-num">02</div><div><h2>Document Classification</h2></div></div>
+  <p class="frag-desc">Azure AI Document Classification API routes each attachment to the correct extraction model. Multi-report documents detected and split. Unrecognized types flagged for human review.</p>
+
+  <p class="frag-desc">Once a document is stored in Blob Storage, it is submitted to a custom-trained classifier built on Azure AI Document Intelligence v4.0. This classifier is trained specifically on the client's document taxonomy — lab reports, clinical notes, denial letters, imaging reports, and any other document type relevant to the practice. The classification output includes a confidence score and, critically, a list of sub-documents detected within a single file. This multi-report detection is essential because a single fax or upload often contains multiple concatenated reports from different providers, each with its own title, author, and date.</p>
+  <p class="frag-desc">When a multi-report document is detected, the system splits it into individual report segments using page range information from the classifier output. Each sub-report gets its own title and author extracted, and is processed independently through the rest of the pipeline. Documents that fail classification or fall below the confidence threshold are not discarded — they are flagged as "unrecognized" and routed to the human review queue, maintaining the zero-drop guarantee established in the ingestion layer.</p>
+
+  <div class="svc-grid">
+    <div class="svc-card"><img src="https://azure.microsoft.com/svghandler/cognitive-services/?width=96" alt="Classifier"><div class="svc-name">Custom Classifier</div><div class="svc-detail">Doc Intelligence v4.0</div></div>
+    <div class="svc-card"><img src="https://img.icons8.com/fluency/96/test-tube.png" alt="Lab"><div class="svc-name">Lab Report</div><div class="svc-detail">Auto-classified</div></div>
+    <div class="svc-card"><img src="https://img.icons8.com/fluency/96/stethoscope.png" alt="Clinical"><div class="svc-name">Clinical Note</div><div class="svc-detail">Auto-classified</div></div>
+    <div class="svc-card"><img src="https://img.icons8.com/fluency/96/cancel.png" alt="Denial"><div class="svc-name">Denial Letter</div><div class="svc-detail">Auto-classified</div></div>
+    <div class="svc-card"><img src="https://img.icons8.com/fluency/96/medical-doctor.png" alt="Imaging"><div class="svc-name">Imaging Report</div><div class="svc-detail">Auto-classified</div></div>
+    <div class="svc-card"><img src="https://img.icons8.com/fluency/96/documents.png" alt="Multi"><div class="svc-name">Multi-Report Split</div><div class="svc-detail">Title + Author per report</div></div>
+  </div>
+
+  <div class="api-block">
+    <h3>Azure APIs</h3>
+    <table class="tbl"><thead><tr><th>API / Service</th><th>Version</th><th>Expected Output</th></tr></thead><tbody>
+      <tr><td class="api-name">Azure AI Document Intelligence — Custom Classification</td><td><span class="vb">2024-11-30 (v4.0)</span></td><td><code>docType</code>, <code>confidence</code>, <code>documents[]</code> for multi-report detection.</td></tr>
+      <tr><td class="api-name">Azure AI Document Intelligence — Build Classifier</td><td><span class="vb">2024-11-30 (v4.0)</span></td><td>Custom classifier trained on client document taxonomy.</td></tr>
+    </tbody></table>
+    <h3>Custom APIs & Libraries</h3>
+    <table class="tbl"><thead><tr><th>Endpoint</th><th>Libraries</th><th>Output</th></tr></thead><tbody>
+      <tr><td class="api-name">POST /api/classify/analyze <span class="ct">CUSTOM</span></td><td><span class="lb">Flask</span><span class="lb">azure-ai-documentintelligence</span><span class="lb">azure-identity</span></td><td><code>doc_type</code>, <code>confidence</code>, <code>sub_documents[]</code> with page ranges.</td></tr>
+      <tr><td class="api-name">Multi-Report Splitter <span class="ct">CUSTOM</span></td><td><span class="lb">pypdf</span><span class="lb">python-docx</span><span class="lb">openpyxl</span></td><td>Returns <code>{title, author, page_range, blob_ref}</code> per sub-report.</td></tr>
+    </tbody></table>
+  </div>
+</div>
+
+<!-- ═══ FRAGMENT 3 — EXTRACTION ═══ -->
+<div class="frag" id="f3">
+  <div class="frag-head"><div class="frag-num">03</div><div><h2>Content Extraction — Form Recognizer v4</h2></div></div>
+  <p class="frag-desc">Custom extraction models per document type. Structured fields, bounding box polygons for visual receipts, date segregation (report vs visit date), embedded video detection.</p>
+
+  <p class="frag-desc">Each classified document is routed to a custom extraction model trained for its specific type. A lab report model extracts different fields than a denial letter model — this per-type specialization is what delivers high accuracy on messy, unstructured faxes. Form Recognizer v4 returns structured fields (title, author, patient DOB, clinical findings) along with polygon coordinates for every extracted value. These bounding box polygons are the foundation of the Visual Receipt system: they pinpoint exactly where on the original document each piece of data was found, enabling one-click source verification by clinicians.</p>
+  <p class="frag-desc">Date segregation is handled as a distinct post-processing step. Medical documents typically contain multiple dates with different meanings — report date, visit date, admission date, discharge date — and conflating them leads to clinical errors. The extraction module parses all date fields and categorizes them by context, ensuring that each signal card carries the correct date type. Additionally, documents are scanned for embedded video content (PDF RichMedia annotations, DOCX OLE objects, PPTX media slots) — detected videos are flagged with their count and location but not indexed, as per the project scope.</p>
+
+  <div class="svc-grid">
+    <div class="svc-card"><img src="https://azure.microsoft.com/svghandler/cognitive-services/?width=96" alt="Form Rec"><div class="svc-name">Custom Model</div><div class="svc-detail">Per doc type</div></div>
+    <div class="svc-card"><img src="https://img.icons8.com/fluency/96/form.png" alt="Fields"><div class="svc-name">Structured Fields</div><div class="svc-detail">Title, Author, Dates</div></div>
+    <div class="svc-card"><img src="https://img.icons8.com/fluency/96/crop.png" alt="BBox"><div class="svc-name">Bounding Boxes</div><div class="svc-detail">Polygon coordinates</div></div>
+    <div class="svc-card"><img src="https://img.icons8.com/fluency/96/calendar.png" alt="Dates"><div class="svc-name">Date Segregation</div><div class="svc-detail">Report vs Visit date</div></div>
+    <div class="svc-card"><img src="https://img.icons8.com/fluency/96/video-file.png" alt="Video"><div class="svc-name">Embedded Video</div><div class="svc-detail">Detect + flag</div></div>
+    <div class="svc-card"><img src="https://img.icons8.com/fluency/96/receipt-approved.png" alt="Receipt"><div class="svc-name">Visual Receipt</div><div class="svc-detail">PNG/SVG snippet</div></div>
+  </div>
+
+  <div class="api-block">
+    <h3>Azure APIs</h3>
+    <table class="tbl"><thead><tr><th>API / Service</th><th>Version</th><th>Expected Output</th></tr></thead><tbody>
+      <tr><td class="api-name">Document Intelligence — Custom Extraction</td><td><span class="vb">2024-11-30 (v4.0)</span></td><td><code>fields{}</code> with key-value pairs and confidence per field.</td></tr>
+      <tr><td class="api-name">Document Intelligence — Layout</td><td><span class="vb">2024-11-30 (v4.0)</span></td><td><code>pages[]</code> → <code>words[]</code>, <code>lines[]</code>, <code>tables[]</code> with <code>polygon</code>.</td></tr>
+      <tr><td class="api-name">Document Intelligence — Query Fields</td><td><span class="vb">2024-11-30 (v4.0)</span></td><td><code>patient_dob</code>, <code>author</code>, <code>report_date</code>, <code>visit_date</code>, <code>clinical_findings</code>.</td></tr>
+    </tbody></table>
+    <h3>Custom APIs & Libraries</h3>
+    <table class="tbl"><thead><tr><th>Endpoint</th><th>Libraries</th><th>Output</th></tr></thead><tbody>
+      <tr><td class="api-name">POST /api/extract/analyze <span class="ct">CUSTOM</span></td><td><span class="lb">Flask</span><span class="lb">azure-ai-documentintelligence</span><span class="lb">azure-identity</span></td><td>Routes to correct model, returns fields + polygons + confidence.</td></tr>
+      <tr><td class="api-name">Date Segregation <span class="ct">CUSTOM</span></td><td><span class="lb">dateutil</span><span class="lb">regex</span></td><td>Categorizes: <code>report_date</code>, <code>visit_date</code>, <code>admission_date</code>, <code>discharge_date</code>.</td></tr>
+      <tr><td class="api-name">Video Detector <span class="ct">CUSTOM</span></td><td><span class="lb">pypdf</span><span class="lb">python-docx</span><span class="lb">zipfile</span><span class="lb">python-pptx</span></td><td><code>has_embedded_video</code>, <code>count</code>, <code>locations[]</code>.</td></tr>
+      <tr><td class="api-name">Visual Receipt Generator <span class="ct">CUSTOM</span></td><td><span class="lb">Pillow</span><span class="lb">pdf2image</span><span class="lb">svgwrite</span></td><td>Crops + highlights source region. PNG/SVG with doc + page ref.</td></tr>
+    </tbody></table>
+  </div>
+</div>
+
+<!-- ═══ FRAGMENT 4 — HEALTH NER ═══ -->
+<div class="frag" id="f4">
+  <div class="frag-head"><div class="frag-num">04</div><div><h2>Healthcare Entity Recognition & Signal Cards</h2></div></div>
+  <p class="frag-desc">Text Analytics for Health extracts clinical entities. Each entity becomes a structured signal card — non-AI-authored, verifiable extraction with source tagging.</p>
+
+  <p class="frag-desc">The extracted text from each document is submitted to Azure AI Language's Text Analytics for Health, which performs named entity recognition (NER) specifically tuned for clinical vocabulary. The service identifies diagnoses (linked to ICD-10 and SNOMED CT codes), medications (with dosage and frequency), symptoms and physical findings, examination names, and treatment procedures. Beyond individual entities, it also extracts relationships between them — which medication is prescribed for which condition, what dosage is associated with what drug, which finding was observed at what time.</p>
+  <p class="frag-desc">Each extracted entity is assembled into a Signal Card using Pydantic models for strict schema validation. A Signal Card is not an AI summary — it is a structured, non-authored extraction that contains the exact entity text, its clinical category, confidence score, UMLS/ICD-10/SNOMED CT code links, and a source tag pointing to the exact document name, page number, and character offset where the entity was found. The accompanying Visual Receipt (a cropped, highlighted snippet of the original document page) provides instant visual verification. This design ensures that every piece of clinical information displayed to a clinician is traceable back to its source with one click.</p>
+
+  <div class="svc-grid">
+    <div class="svc-card"><img src="https://img.icons8.com/fluency/96/artificial-intelligence.png" alt="NER"><div class="svc-name">Health NER</div><div class="svc-detail">Azure AI Language</div></div>
+    <div class="svc-card"><img src="https://img.icons8.com/fluency/96/stethoscope.png" alt="Diag"><div class="svc-name">Diagnosis</div><div class="svc-detail">ICD-10 / SNOMED CT</div></div>
+    <div class="svc-card"><img src="https://img.icons8.com/fluency/96/pill.png" alt="Med"><div class="svc-name">Medication</div><div class="svc-detail">Dosage + relations</div></div>
+    <div class="svc-card"><img src="https://img.icons8.com/fluency/96/search.png" alt="Find"><div class="svc-name">Physical Findings</div><div class="svc-detail">Symptoms + signs</div></div>
+    <div class="svc-card"><img src="https://img.icons8.com/fluency/96/cancel.png" alt="Denial"><div class="svc-name">Denial Rationale</div><div class="svc-detail">Structured extraction</div></div>
+    <div class="svc-card"><img src="https://img.icons8.com/fluency/96/cards.png" alt="Cards"><div class="svc-name">Signal Cards</div><div class="svc-detail">Source tagged + receipt</div></div>
+  </div>
+
+  <div class="api-block">
+    <h3>Azure APIs</h3>
+    <table class="tbl"><thead><tr><th>API / Service</th><th>Version</th><th>Expected Output</th></tr></thead><tbody>
+      <tr><td class="api-name">Azure AI Language — Text Analytics for Health</td><td><span class="vb">2024-11-01</span></td><td><code>entities[]</code>: Diagnosis, Medication, SymptomOrSign, Examination, Treatment. With UMLS/ICD-10/SNOMED links.</td></tr>
+      <tr><td class="api-name">Azure AI Language — Entity Relations</td><td><span class="vb">2024-11-01</span></td><td><code>relations[]</code>: DosageOfMedication, TimeOfCondition, QualifierOfCondition.</td></tr>
+    </tbody></table>
+    <h3>Custom APIs & Libraries</h3>
+    <table class="tbl"><thead><tr><th>Endpoint</th><th>Libraries</th><th>Output</th></tr></thead><tbody>
+      <tr><td class="api-name">POST /api/ai/health-entities <span class="ct">CUSTOM</span></td><td><span class="lb">Flask</span><span class="lb">azure-ai-textanalytics</span><span class="lb">azure-identity</span></td><td>Maps entities to signal categories with confidence.</td></tr>
+      <tr><td class="api-name">Signal Card Builder <span class="ct">CUSTOM</span></td><td><span class="lb">pydantic</span><span class="lb">jinja2</span></td><td>Entity + visual receipt + source tag → SignalCard. Non-AI-authored.</td></tr>
+    </tbody></table>
+  </div>
+</div>
+
+<!-- ═══ FRAGMENT 5 — VECTORIZATION ═══ -->
+<div class="frag" id="f5">
+  <div class="frag-head"><div class="frag-num">05</div><div><h2>Chunking, Vectorization & Cosmos DB</h2></div></div>
+  <p class="frag-desc">Documents split into semantic chunks, vectorized via Azure OpenAI Embeddings, stored in Cosmos DB with vector index. Signal cards linked. Everything indexed by Patient ID.</p>
+
+  <p class="frag-desc">In parallel with signal card generation, each document's full extracted text is split into semantic chunks of approximately 500 tokens with a 50-token overlap. The chunking algorithm respects paragraph and sentence boundaries to preserve contextual coherence. Each chunk is then vectorized using Azure OpenAI's text-embedding-3-large model, producing a 3072-dimension vector representation that captures the semantic meaning of the text. This enables clinicians to search across a patient's entire document history using natural language queries rather than exact keyword matching.</p>
+  <p class="frag-desc">All data — vector chunks, signal cards, document metadata, and processing status — is stored in Azure Cosmos DB using the NoSQL API with DiskANN vector indexing. The database is partitioned by Patient ID, which means all data for a given patient is co-located for fast retrieval. Each signal card maintains cross-references to its source chunks, and each chunk carries a reference back to its source document and page. This bidirectional linking enables the Chrome Extension to seamlessly navigate from a search result to a signal card to the original document page, creating a complete provenance chain.</p>
+
+  <div class="svc-grid">
+    <div class="svc-card"><img src="https://img.icons8.com/fluency/96/cut.png" alt="Chunk"><div class="svc-name">Semantic Chunker</div><div class="svc-detail">~500 tokens / chunk</div></div>
+    <div class="svc-card"><img src="https://azure.microsoft.com/svghandler/openai/?width=96" alt="Embed"><div class="svc-name">OpenAI Embeddings</div><div class="svc-detail">text-embedding-3-large</div></div>
+    <div class="svc-card"><img src="https://azure.microsoft.com/svghandler/cosmos-db/?width=96" alt="Cosmos"><div class="svc-name">Cosmos DB</div><div class="svc-detail">NoSQL + Vector Index</div></div>
+    <div class="svc-card"><img src="https://img.icons8.com/fluency/96/link.png" alt="Link"><div class="svc-name">Card ↔ Chunk Link</div><div class="svc-detail">Cross-references</div></div>
+    <div class="svc-card"><img src="https://img.icons8.com/fluency/96/user-male-circle.png" alt="PID"><div class="svc-name">Patient ID Index</div><div class="svc-detail">Partition key</div></div>
+  </div>
+
+  <div class="api-block">
+    <h3>Azure APIs</h3>
+    <table class="tbl"><thead><tr><th>API / Service</th><th>Version</th><th>Expected Output</th></tr></thead><tbody>
+      <tr><td class="api-name">Azure OpenAI — Embeddings (text-embedding-3-large)</td><td><span class="vb">2024-10-21</span></td><td>3072-dimension vector per chunk.</td></tr>
+      <tr><td class="api-name">Azure Cosmos DB — NoSQL + Vector Search (DiskANN)</td><td><span class="vb">2024-11-15</span></td><td>Signal cards + vector chunks. Partitioned by <code>patient_id</code>.</td></tr>
+    </tbody></table>
+    <h3>Custom APIs & Libraries</h3>
+    <table class="tbl"><thead><tr><th>Endpoint</th><th>Libraries</th><th>Output</th></tr></thead><tbody>
+      <tr><td class="api-name">Semantic Chunker <span class="ct">CUSTOM</span></td><td><span class="lb">langchain-text-splitters</span><span class="lb">tiktoken</span></td><td>~500 token chunks, 50 overlap, paragraph-aware. <code>chunks[]</code> with <code>page_ref</code>.</td></tr>
+      <tr><td class="api-name">POST /api/store/vectorize <span class="ct">CUSTOM</span></td><td><span class="lb">Flask</span><span class="lb">openai</span><span class="lb">azure-cosmos</span><span class="lb">azure-identity</span></td><td>Embeds + stores with card cross-refs and Patient ID partition.</td></tr>
+    </tbody></table>
+  </div>
+</div>
+
+<!-- ═══ FRAGMENT 6 — PATIENT ACCESS ═══ -->
+<div class="frag" id="f6">
+  <div class="frag-head"><div class="frag-num">06</div><div><h2>Chrome Extension, Patient ID Sync & Search</h2></div></div>
+  <p class="frag-desc">Chrome Extension captures Patient ID from EMR URL, queries Cosmos DB via Flask API. Displays signal cards and enables semantic search. Click any card to verify in the original document.</p>
+
+  <p class="frag-desc">The Chrome Extension is the primary interface for clinicians. It operates as a lightweight side panel that activates when the user navigates to a patient page in the EMR system. The extension parses the EMR URL to extract the Patient ID, then calls the Flask Blueprint API to retrieve all signal cards, documents, and search capabilities scoped to that specific patient. The JavaScript in the extension is intentionally minimal — it handles URL detection, API calls via fetch, and DOM rendering only. All business logic, data processing, and security enforcement lives in the Python backend.</p>
+  <p class="frag-desc">Three API endpoints power the extension. The cards endpoint returns all signal cards for the patient, each with its entity type, value, confidence, and source reference. The search endpoint accepts natural language queries (e.g., "latest blood work results" or "denial rationale for MRI"), embeds them using the same OpenAI model, and performs a vector similarity search scoped to the patient's documents. The documents endpoint lists all files associated with the patient, their processing status, and provides short-lived SAS URLs for direct document viewing. When a clinician clicks on any signal card, the source verification flow opens the original document at the exact page with the relevant region highlighted — providing the verifiable "Visual Receipt" that is the core success criterion of this project.</p>
+
+  <div class="svc-grid">
+    <div class="svc-card"><img src="https://img.icons8.com/fluency/96/monitor--v1.png" alt="EMR"><div class="svc-name">EMR System</div><div class="svc-detail">Browser tab</div></div>
+    <div class="svc-card"><img src="https://img.icons8.com/fluency/96/chrome.png" alt="Chrome"><div class="svc-name">Chrome Extension</div><div class="svc-detail">Patient ID from URL</div></div>
+    <div class="svc-card"><img src="https://img.icons8.com/fluency/96/cards.png" alt="Cards"><div class="svc-name">GET /patient/cards</div><div class="svc-detail">Signal cards by patient</div></div>
+    <div class="svc-card"><img src="https://img.icons8.com/fluency/96/search.png" alt="Search"><div class="svc-name">POST /patient/search</div><div class="svc-detail">Semantic search</div></div>
+    <div class="svc-card"><img src="https://img.icons8.com/fluency/96/document.png" alt="Docs"><div class="svc-name">GET /patient/docs</div><div class="svc-detail">Document list + SAS</div></div>
+    <div class="svc-card"><img src="https://img.icons8.com/fluency/96/security-checked.png" alt="Verify"><div class="svc-name">Source Verification</div><div class="svc-detail">Click → original page</div></div>
+  </div>
+
+  <div class="api-block">
+    <h3>Azure APIs</h3>
+    <table class="tbl"><thead><tr><th>API / Service</th><th>Version</th><th>Expected Output</th></tr></thead><tbody>
+      <tr><td class="api-name">Cosmos DB — NoSQL Query</td><td><span class="vb">2024-11-15</span></td><td>SQL by <code>patient_id</code> partition. Returns cards, docs, status.</td></tr>
+      <tr><td class="api-name">Cosmos DB — Vector Search</td><td><span class="vb">2024-11-15</span></td><td>Semantic search over patient chunks. Ranked with similarity + source.</td></tr>
+      <tr><td class="api-name">Blob Storage — SAS Token</td><td><span class="vb">2024-11-04</span></td><td>Short-lived URLs for original document verification.</td></tr>
+    </tbody></table>
+    <h3>Custom APIs & Libraries</h3>
+    <table class="tbl"><thead><tr><th>Endpoint</th><th>Libraries</th><th>Output</th></tr></thead><tbody>
+      <tr><td class="api-name">GET /api/patient/{id}/cards <span class="ct">CUSTOM</span></td><td><span class="lb">Flask</span><span class="lb">azure-cosmos</span></td><td>All cards: entity, value, confidence, doc ref, page, receipt URL.</td></tr>
+      <tr><td class="api-name">POST /api/patient/{id}/search <span class="ct">CUSTOM</span></td><td><span class="lb">Flask</span><span class="lb">azure-cosmos</span><span class="lb">openai</span></td><td>Query → embed → vector search scoped to patient.</td></tr>
+      <tr><td class="api-name">GET /api/patient/{id}/documents <span class="ct">CUSTOM</span></td><td><span class="lb">Flask</span><span class="lb">azure-cosmos</span><span class="lb">azure-storage-blob</span></td><td>Document list: name, type, date, status, report count, SAS URL.</td></tr>
+      <tr><td class="api-name">Chrome Extension <span class="ct">JS SHELL</span></td><td><span class="lb">chrome.tabs</span><span class="lb">fetch</span></td><td>Patient ID from URL → calls Flask → renders cards. Zero business logic in JS.</td></tr>
+    </tbody></table>
+  </div>
+</div>
+
+<!-- ═══ FRAGMENT 7 — MONITORING ═══ -->
+<div class="frag" id="f7">
+  <div class="frag-head"><div class="frag-num">07</div><div><h2>Dashboard Monitoring & Error Handling</h2></div></div>
+  <p class="frag-desc">Tracks emails received, documents processed, error counts, per-document status. Zero documents dropped — problems flagged and queued for human intervention.</p>
+
+  <p class="frag-desc">The monitoring dashboard provides a real-time operational view of the entire pipeline. It displays four primary metrics — total emails received, documents successfully processed, current error count, and documents pending human review — updated in real time via Cosmos DB Change Feed. Below the summary counters, a paginated document list shows every file in the system with its current status (processed, error, pending review), the pipeline stage it reached before any failure, the specific error detail if applicable, and a timestamp for each state change. This gives operations staff immediate visibility into the system's health without digging through logs.</p>
+  <p class="frag-desc">The error handling philosophy is proactive, not reactive. When a document fails at any stage — classification, extraction, NER, or vectorization — it is not retried silently. Instead, a human intervention task is created with the full context: which document, which stage, what error, and a direct link to the original file in Blob Storage. A staff member can review the issue, decide whether to re-queue the document for processing (after fixing the root cause) or annotate it with notes for later resolution. The goal is zero documents in error state — the dashboard makes this goal visible and actionable at all times, with Azure Monitor Application Insights providing the underlying telemetry, exception tracking, and alerting infrastructure.</p>
+
+  <div class="svc-grid">
+    <div class="svc-card"><img src="https://azure.microsoft.com/svghandler/monitor/?width=96" alt="Monitor"><div class="svc-name">App Insights</div><div class="svc-detail">Telemetry + metrics</div></div>
+    <div class="svc-card"><img src="https://azure.microsoft.com/svghandler/cosmos-db/?width=96" alt="Feed"><div class="svc-name">Change Feed</div><div class="svc-detail">Live event stream</div></div>
+    <div class="svc-card"><img src="https://img.icons8.com/fluency/96/monitor--v1.png" alt="Dashboard"><div class="svc-name">Dashboard</div><div class="svc-detail">Stats + doc status</div></div>
+    <div class="svc-card"><img src="https://img.icons8.com/fluency/96/error.png" alt="Alert"><div class="svc-name">Human Alert Queue</div><div class="svc-detail">Resolve + re-queue</div></div>
+  </div>
+
+  <div class="api-block">
+    <h3>Azure APIs</h3>
+    <table class="tbl"><thead><tr><th>API / Service</th><th>Version</th><th>Expected Output</th></tr></thead><tbody>
+      <tr><td class="api-name">Cosmos DB — Change Feed</td><td><span class="vb">2024-11-15</span></td><td>Real-time stream. Powers live counters + error alerts.</td></tr>
+      <tr><td class="api-name">Azure Monitor — Application Insights</td><td><span class="vb">2024-10-01</span></td><td>Telemetry, exceptions, custom metrics.</td></tr>
+    </tbody></table>
+    <h3>Custom APIs & Libraries</h3>
+    <table class="tbl"><thead><tr><th>Endpoint</th><th>Libraries</th><th>Output</th></tr></thead><tbody>
+      <tr><td class="api-name">GET /api/dashboard/stats <span class="ct">CUSTOM</span></td><td><span class="lb">Flask</span><span class="lb">azure-cosmos</span></td><td><code>emails_received</code>, <code>documents_processed</code>, <code>error_count</code>, <code>pending_review</code>.</td></tr>
+      <tr><td class="api-name">GET /api/dashboard/documents <span class="ct">CUSTOM</span></td><td><span class="lb">Flask</span><span class="lb">azure-cosmos</span></td><td>Paginated: status, error_detail, stage_reached, timestamp.</td></tr>
+      <tr><td class="api-name">POST /api/dashboard/resolve <span class="ct">CUSTOM</span></td><td><span class="lb">Flask</span><span class="lb">azure-cosmos</span></td><td>Mark resolved, re-queue, annotate.</td></tr>
+    </tbody></table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- MILESTONES                                  -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="sec" id="milestones">
+  <div class="sec-label">Delivery Plan</div>
+  <h2>Milestones & Evidence</h2>
+  <p class="sec-desc">Each milestone has defined deliverables and acceptance criteria with verifiable evidence.</p>
+
+  <p class="frag-desc">The project is structured into five consecutive milestones, each with a clear scope boundary and measurable acceptance criteria. This phased approach ensures that the client sees working, testable output at regular intervals rather than waiting for a single big-bang delivery. Each milestone builds on the previous one — infrastructure must be solid before classification can work, extraction must be proven before NER can run, and so on. This dependency chain is by design: it catches integration issues early and prevents expensive rework later in the project.</p>
+  <p class="frag-desc">Every milestone concludes with a formal acceptance review. The deliverables are demonstrated live (screen-recorded as per the Recorded Evidence Work Policy), and the client validates each acceptance criterion against the evidence provided. Payment for the milestone is released only after this review is complete and the client confirms satisfaction. If a criterion is not met, the issue is documented and resolved before the milestone is closed. This structure protects both sides: the client gets verified quality at each step, and the developer has clear, unambiguous completion criteria.</p>
+
+  <div class="ms-grid">
+    <div class="ms-card"><div class="ms-phase">Phase 1</div><div class="ms-title">Infrastructure & Ingestion</div><div class="ms-time">Week 1–2</div><div class="ms-scope">Azure infra (Bicep/IaC), Managed Identities, RBAC, Flask scaffold, Graph webhook, Blob pipeline, video MIME detection, error handling (zero drop + human task).</div><div class="ev-label">Acceptance Evidence</div><ul class="ev-list"><li>Email sent → attachment in Blob in &lt;30s</li><li>Video attachment → flagged with type + count</li><li>Simulated failure → document stored + task created</li><li>Bicep deploys all resources in one command</li></ul></div>
+    <div class="ms-card"><div class="ms-phase">Phase 2</div><div class="ms-title">Classification & Extraction</div><div class="ms-time">Week 3–4</div><div class="ms-scope">Custom classifier training, Form Rec v4 custom models (×4 types), multi-report split, date segregation, embedded video detection, visual receipt generation.</div><div class="ev-label">Acceptance Evidence</div><ul class="ev-list"><li>10 sample docs → classified with &gt;90% confidence</li><li>Multi-report PDF → split with title + author</li><li>Report date vs visit date extracted distinctly</li><li>Visual receipt PNG with highlighted region</li><li>DOCX with video → detected and flagged</li></ul></div>
+    <div class="ms-card"><div class="ms-phase">Phase 3</div><div class="ms-title">Health NER & Signal Cards</div><div class="ms-time">Week 5–6</div><div class="ms-scope">Text Analytics Health, entity→signal mapping, Signal Card builder, source tagging, semantic chunker, vectorization, Cosmos DB schema + vector index.</div><div class="ev-label">Acceptance Evidence</div><ul class="ev-list"><li>Clinical note → Diagnosis, Medication, Findings with UMLS</li><li>Each card has clickable source tag (doc + page)</li><li>Cards are non-AI-authored extraction only</li><li>Semantic search returns relevant chunks</li></ul></div>
+    <div class="ms-card"><div class="ms-phase">Phase 4</div><div class="ms-title">Patient Access & Chrome Extension</div><div class="ms-time">Week 7–8</div><div class="ms-scope">Chrome Extension, Patient ID sync, 3 Flask APIs, semantic search, SAS URL viewing, source verification, UX polish.</div><div class="ev-label">Acceptance Evidence</div><ul class="ev-list"><li>EMR page → extension detects ID → shows cards</li><li>Search "latest blood work" → relevant results</li><li>Click card → original doc page with highlight</li><li>Document list shows status for all patient docs</li></ul></div>
+    <div class="ms-card"><div class="ms-phase">Phase 5</div><div class="ms-title">Dashboard, CI/CD & Compliance</div><div class="ms-time">Week 9–10</div><div class="ms-scope">Dashboard, Cosmos Change Feed, GitHub Actions (4 workflows), HIPAA hardening, load test (100+ docs), documentation.</div><div class="ev-label">Acceptance Evidence</div><ul class="ev-list"><li>Dashboard with live counters + per-doc status</li><li>Flagged doc → visible with resolve action</li><li>Zero secrets — all via Managed Identities</li><li>100 docs batch → zero dropped</li><li>Full API docs + deployment runbook</li></ul></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- CI/CD                                       -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="sec" id="cicd">
+  <div class="sec-label">DevOps</div>
+  <h2>CI/CD — GitHub Actions</h2>
+  <p class="sec-desc">Trunk-based development. Every push triggers lint + test. Merge to main triggers staging deploy. Tag triggers production with blue-green rollout.</p>
+
+  <p class="frag-desc">The CI/CD pipeline is built on GitHub Actions with four distinct workflow files, each triggered by different events. The CI workflow runs on every push to any branch and every pull request to main — it installs dependencies, runs ruff for Python linting, executes the full pytest suite (unit + integration tests with a coverage gate of 85%), and performs a bandit security scan. No code reaches the main branch without passing all these gates. This automated quality enforcement eliminates the "it works on my machine" problem and ensures that the main branch is always in a deployable state.</p>
+  <p class="frag-desc">Deployment follows a staged promotion model. When code is merged to main, the staging workflow automatically builds a Docker image, scans it with trivy for container vulnerabilities, pushes it to Azure Container Registry, and deploys it to the staging Container App environment where smoke tests run. Production deployment is triggered only by tagging a commit on main (e.g., v1.0.0), which promotes the staging-tested image to the production Container App using a blue-green strategy with traffic splitting. If the health check fails after deployment, an automatic rollback restores the previous version. A separate infrastructure workflow watches for changes in the /infra directory and applies Bicep templates through a validate → dry-run → manual approval → deploy sequence.</p>
+
+  <div class="cicd-flow">
+    <div class="cicd-s"><img src="https://img.icons8.com/fluency/96/github.png" alt="Git" style="width:32px;height:32px"><div class="cicd-sn">Commit</div><div class="cicd-sd">Push → PR to main</div></div>
+    <div class="cicd-s"><img src="https://img.icons8.com/fluency/96/search.png" alt="Lint" style="width:32px;height:32px"><div class="cicd-sn">Lint & Test</div><div class="cicd-sd">ruff + pytest &gt;85%</div></div>
+    <div class="cicd-s"><img src="https://img.icons8.com/fluency/96/security-checked.png" alt="Sec" style="width:32px;height:32px"><div class="cicd-sn">Security</div><div class="cicd-sd">bandit + trivy</div></div>
+    <div class="cicd-s"><img src="https://img.icons8.com/fluency/96/docker.png" alt="Build" style="width:32px;height:32px"><div class="cicd-sn">Build</div><div class="cicd-sd">Docker → ACR</div></div>
+    <div class="cicd-s"><img src="https://azure.microsoft.com/svghandler/container-apps/?width=96" alt="Stage" style="width:32px;height:32px"><div class="cicd-sn">Staging</div><div class="cicd-sd">Auto-deploy + smoke</div></div>
+    <div class="cicd-s"><img src="https://img.icons8.com/fluency/96/rocket.png" alt="Prod" style="width:32px;height:32px"><div class="cicd-sn">Production</div><div class="cicd-sd">Tag → blue-green</div></div>
+  </div>
+
+  <div class="api-block">
+    <h3>GitHub Actions Workflows</h3>
+    <table class="tbl"><thead><tr><th>File</th><th>Trigger</th><th>Steps</th></tr></thead><tbody>
+      <tr><td class="api-name">ci.yml</td><td>Push / PR to main</td><td>Python 3.11 → ruff → pytest → coverage → bandit</td></tr>
+      <tr><td class="api-name">cd-staging.yml</td><td>Merge to main</td><td>Docker build → trivy → ACR → Container App staging → smoke tests</td></tr>
+      <tr><td class="api-name">cd-prod.yml</td><td>Tag v*</td><td>Re-tag → prod Container App (blue-green) → health check → traffic switch</td></tr>
+      <tr><td class="api-name">infra.yml</td><td>/infra/** changes</td><td>Bicep validate → what-if → approval gate → deploy</td></tr>
+    </tbody></table>
+    <h3>Branching Strategy</h3>
+    <table class="tbl"><thead><tr><th>Branch</th><th>Purpose</th><th>Protection</th></tr></thead><tbody>
+      <tr><td class="api-name">main</td><td>Production-ready. All deploys originate here.</td><td>PR + approval + CI pass</td></tr>
+      <tr><td class="api-name">feature/*</td><td>Short-lived (max 3 days).</td><td>CI on every push</td></tr>
+      <tr><td class="api-name">hotfix/*</td><td>Critical fixes. Fast-track.</td><td>CI + security required</td></tr>
+    </tbody></table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- PRICING                                     -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="sec" id="pricing">
+  <div class="sec-label">Engagement Model</div>
+  <h2>Pricing — Hour-Range Milestones</h2>
+  <p class="sec-desc">Transparent hour-range model per milestone. Every billed hour backed by screen-recorded evidence. You pay only for documented, verifiable work.</p>
+
+  <p class="frag-desc">This engagement uses an hour-range model rather than a fixed price, and there is a deliberate reason for this. The project involves custom AI model training where the number of iterations required depends on factors that cannot be predicted upfront — the quality and consistency of the client's real documents, the number of distinct document types that need custom models, and the complexity of multi-report compounds. A fixed price would force either inflated padding (overcharging) or corner-cutting to stay in budget (underdelivering). The hour-range model eliminates both problems by aligning cost with actual verified effort.</p>
+  <p class="frag-desc">The Recorded Evidence Work Policy is the mechanism that makes this model trustworthy. Every working session is screen-recorded — IDE, terminal, Azure portal, browser testing, everything. Each recording is timestamped, mapped to a specific GitHub issue or task, and tied to the corresponding Git commits. The client has permanent access to all recordings via a shared cloud folder. Weekly invoices include direct links to the relevant recordings for that billing period. If any hour is disputed, the client reviews the recording and the hour is not billed unless the work is clearly visible. This creates a fully transparent, audit-ready engagement where every euro spent is documented.</p>
+
+  <div class="policy-box">
+    <h3>Recorded Evidence Work Policy</h3>
+    <p>Every working session is <strong>screen-recorded</strong> and stored. The client receives access to all recordings. Invoiced hours are verified against recording timestamps. This ensures <strong>100% transparency</strong> — you pay only for documented, verifiable work.</p>
+  </div>
+
+  <table class="ptbl">
+    <thead><tr><th>Milestone</th><th>Min</th><th>Max</th><th>Scope</th><th>Recorded Evidence</th></tr></thead>
+    <tbody>
+      <tr><td class="api-name">M1 — Infrastructure & Ingestion</td><td><span class="hr hr-min">65h</span></td><td><span class="hr hr-max">90h</span></td><td>Azure infra, Graph webhook, Blob pipeline, video detection, error handling</td><td><span class="et">Infra deploy</span><span class="et">Webhook demo</span><span class="et">Error flag</span></td></tr>
+      <tr><td class="api-name">M2 — Classification & Extraction</td><td><span class="hr hr-min">85h</span></td><td><span class="hr hr-max">120h</span></td><td>Custom classifier, Form Rec v4 models ×4, multi-report, dates, video, receipts</td><td><span class="et">Training</span><span class="et">Accuracy &gt;90%</span><span class="et">Multi-report</span><span class="et">Receipts</span></td></tr>
+      <tr><td class="api-name">M3 — Health NER & Signal Cards</td><td><span class="hr hr-min">70h</span></td><td><span class="hr hr-max">95h</span></td><td>Health NER, entity mapping, cards, source tags, chunking, Cosmos DB</td><td><span class="et">NER demo</span><span class="et">Cards</span><span class="et">Vector search</span></td></tr>
+      <tr><td class="api-name">M4 — Patient Access & Chrome</td><td><span class="hr hr-min">80h</span></td><td><span class="hr hr-max">105h</span></td><td>3 Flask APIs, Chrome Extension, semantic search, source verification</td><td><span class="et">Chrome in EMR</span><span class="et">Search</span><span class="et">Verify flow</span></td></tr>
+      <tr><td class="api-name">M5 — Dashboard, CI/CD & HIPAA</td><td><span class="hr hr-min">80h</span></td><td><span class="hr hr-max">110h</span></td><td>Dashboard, Change Feed, GitHub Actions ×4, HIPAA, load test, docs</td><td><span class="et">Dashboard</span><span class="et">CI/CD run</span><span class="et">100-doc test</span><span class="et">Security</span></td></tr>
+    </tbody>
+    <tfoot><tr><td><strong>TOTAL</strong></td><td><span class="hr hr-min">380h</span></td><td><span class="hr hr-max">520h</span></td><td><strong>Full pipeline — 7 components + CI/CD + HIPAA</strong></td><td><strong style="color:#2E7D32">All sessions recorded</strong></td></tr></tfoot>
+  </table>
+
+  <div class="est-box">
+    <div class="el">Realistic Estimate</div>
+    <div class="ev">420 – 480h</div>
+    <div class="en">Based on experience with similar healthcare AI projects on Azure</div>
+  </div>
+
+  <div style="margin-top:36px"><div class="sec-label">What Drives Hours</div><h2 style="font-size:24px;margin-bottom:20px">Toward Minimum vs Maximum</h2></div>
+  <div class="fg">
+    <div class="fc fmin"><div class="fc-l">→ Toward Minimum (380h)</div><ul><li>Clean, consistent document formats</li><li>Good labeled samples → fast convergence</li><li>Quick client reviews, clear decisions</li><li>Standard document types</li><li>Standard EMR URL pattern</li></ul></div>
+    <div class="fc fmax"><div class="fc-l">→ Toward Maximum (520h)</div><ul><li>Messy faxes, mixed formats, poor scans</li><li>Limited samples → retraining cycles</li><li>Multiple revisions, scope changes</li><li>Unusual formats, compound docs</li><li>Complex URL parsing, CORS issues</li></ul></div>
+  </div>
+
+  <div style="margin-top:36px"><div class="sec-label">Billing</div><h2 style="font-size:24px;margin-bottom:20px">How It Works</h2></div>
+  <table class="tbl"><thead><tr><th>Mechanism</th><th>Detail</th></tr></thead><tbody>
+    <tr><td class="api-name">Hourly Rate</td><td><strong>60€/h</strong> — uniform across all milestones.</td></tr>
+    <tr><td class="api-name">Weekly Invoicing</td><td>Hours billed weekly with links to screen recordings.</td></tr>
+    <tr><td class="api-name">Milestone Gates</td><td>Payment released per milestone after evidence review + client approval.</td></tr>
+    <tr><td class="api-name">Dispute Resolution</td><td>Disputed hour → client reviews recording. If work isn't visible, not billed.</td></tr>
+    <tr><td class="api-name">Efficiency Reward</td><td>Under minimum → saved hours not billed. Client benefits from efficiency.</td></tr>
+  </tbody></table>
+
+  <div style="margin-top:36px"><div class="sec-label">Commitments</div><h2 style="font-size:24px;margin-bottom:20px">Client Guarantees</h2></div>
+  <div class="gg">
+    <div class="gi"><div class="gi-i">🎥</div><div class="gi-t">100% Transparency</div><div class="gi-d">Every billed hour backed by screen recording.</div></div>
+    <div class="gi"><div class="gi-i">📄</div><div class="gi-t">Zero Document Loss</div><div class="gi-d">No document ever dropped. Failures flagged for review.</div></div>
+    <div class="gi"><div class="gi-i">✅</div><div class="gi-t">Verifiable Signals</div><div class="gi-d">Structured extraction with source tagging, not AI summary.</div></div>
+    <div class="gi"><div class="gi-i">🔐</div><div class="gi-t">Milestone Gates</div><div class="gi-d">Payment after evidence review and approval.</div></div>
+    <div class="gi"><div class="gi-i">🔍</div><div class="gi-t">Right to Audit</div><div class="gi-d">Review any recording anytime. Disputes resolved on evidence.</div></div>
+    <div class="gi"><div class="gi-i">🔓</div><div class="gi-t">No Lock-in</div><div class="gi-d">All code, docs, recordings are client property. Full IP transfer.</div></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- DEPLOY                                      -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="sec" id="deploy">
+  <div class="sec-label">Hosting</div>
+  <h2>Publication — Azure Static Web Apps</h2>
+  <p class="sec-desc">This architecture document is published as a static site via Azure Static Web Apps, connected to the project's GitHub repository for automatic deployments.</p>
+
+  <p class="frag-desc">Azure Static Web Apps is chosen for hosting this documentation because it provides a globally distributed CDN, automatic HTTPS with free SSL certificates, and a seamless integration with GitHub Actions — all on the free tier. When this HTML file is pushed to the project's GitHub repository, a GitHub Action workflow (auto-generated by Azure during the initial setup) builds and deploys the static site within approximately 60 seconds. This means that any update to the architecture document is live immediately after a push to main, keeping the documentation in sync with the actual codebase.</p>
+  <p class="frag-desc">The deployment is entirely infrastructure-as-code. The Azure Static Web App resource can be provisioned with a single Azure CLI command that links it to the GitHub repository. No manual configuration is required — Azure handles the webhook setup, the build pipeline, and the CDN distribution automatically. For production use, a custom domain can be attached with a single CLI command, and Azure provisions and manages the SSL certificate. This approach ensures that the documentation site has the same level of automation, reliability, and auditability as the application itself.</p>
+
+  <div class="svc-grid">
+    <div class="svc-card"><img src="https://img.icons8.com/fluency/96/github.png" alt="GitHub"><div class="svc-name">GitHub Repository</div><div class="svc-detail">Source of truth for all project code and documentation</div></div>
+    <div class="svc-card"><img src="https://azure.microsoft.com/svghandler/container-apps/?width=96" alt="SWA"><div class="svc-name">Azure Static Web Apps</div><div class="svc-detail">Free tier, global CDN, custom domain, HTTPS</div></div>
+    <div class="svc-card"><img src="https://img.icons8.com/fluency/96/rocket.png" alt="Deploy"><div class="svc-name">Auto-Deploy</div><div class="svc-detail">Push to main → live in ~60 seconds</div></div>
+  </div>
+
+  <div class="api-block">
+    <h3>Deployment Steps</h3>
+    <table class="tbl"><thead><tr><th>Step</th><th>Command / Action</th><th>Result</th></tr></thead><tbody>
+      <tr><td class="api-name">1. Create Static Web App</td><td><code>az staticwebapp create --name med-doc-arch --resource-group rg-meddoc --source https://github.com/[repo] --branch main --app-location "/" --output-location "/"</code></td><td>Azure SWA resource provisioned, linked to GitHub repo</td></tr>
+      <tr><td class="api-name">2. GitHub Action auto-generated</td><td>Azure creates <code>.github/workflows/azure-static-web-apps-*.yml</code> automatically</td><td>CI/CD pipeline for static site deploys on every push to main</td></tr>
+      <tr><td class="api-name">3. Place this file</td><td>Copy <code>architecture_blueprint.html</code> as <code>index.html</code> in repo root</td><td>Document served at <code>https://[app-name].azurestaticapps.net</code></td></tr>
+      <tr><td class="api-name">4. Custom domain (optional)</td><td><code>az staticwebapp hostname set --name med-doc-arch --hostname docs.yourdomain.com</code></td><td>Custom domain with free SSL certificate</td></tr>
+    </tbody></table>
+
+    <h3>Azure CLI Quick Setup</h3>
+    <table class="tbl"><thead><tr><th>Command</th><th>Purpose</th></tr></thead><tbody>
+      <tr><td><code>az login</code></td><td>Authenticate to Azure</td></tr>
+      <tr><td><code>az group create --name rg-meddoc --location eastus2</code></td><td>Create resource group</td></tr>
+      <tr><td><code>az staticwebapp create --name med-doc-arch --resource-group rg-meddoc --source https://github.com/[owner]/[repo] --branch main --login-with-github</code></td><td>Create SWA + link GitHub</td></tr>
+      <tr><td><code>az staticwebapp show --name med-doc-arch --query "defaultHostname"</code></td><td>Get the live URL</td></tr>
+    </tbody></table>
+  </div>
+</div>
+
+<!-- ═══ FOOTER ═══ -->
+<footer class="footer">Medical Document Orchestration System — <span>Architecture Blueprint v4.0</span><br>Microsoft Azure AI · Flask Blueprint · Cosmos DB · GitHub Actions · HIPAA Compliant</footer>
+
+<script>
+const obs=new IntersectionObserver(e=>{e.forEach(x=>{if(x.isIntersecting)x.target.classList.add('v')})},{threshold:.08,rootMargin:'0px 0px -40px 0px'});
+document.querySelectorAll('.sec,.frag').forEach(el=>obs.observe(el));
+const secs=document.querySelectorAll('.sec[id],.frag[id]');
+const navs=document.querySelectorAll('.nav a');
+const no=new IntersectionObserver(e=>{e.forEach(x=>{if(x.isIntersecting){navs.forEach(l=>l.classList.remove('active'));const l=document.querySelector(`.nav a[href="#${x.target.id}"]`);if(l)l.classList.add('active')}})},{threshold:.3});
+secs.forEach(s=>no.observe(s));
+</script>
+</body>
+</html>
